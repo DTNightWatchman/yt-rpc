@@ -1,5 +1,7 @@
 package com.yt.example.provide;
 
+import com.yt.example.common.model.User;
+
 /**
  * @author by yt
  * @Classname UserServiceImpl
@@ -8,5 +10,10 @@ package com.yt.example.provide;
  */
 public class UserServiceImpl {
 
+
+    public User getUser(User user) {
+        System.out.println("用户名：" + user.getName());
+        return user;
+    }
 
 }
