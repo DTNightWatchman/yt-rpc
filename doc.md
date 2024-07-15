@@ -146,3 +146,144 @@ public class UserServiceProxy implements UserService {
 动态代理的作用是根据要生成的对象的类型，自动生成一个代理对象
 
 > 常用的动态代理实现方式有 JDK 动态代理和基于字节码生成的动态代理（比如 CGLIB）。前者简单易用、无需引入额外的库，但缺点是只能对接口进行代理；后者更灵活、可以对任何类进行代理，但性能略低于 JDK 动态代理。
+
+创建一个服务代理类，继承 `InvocationHandler` 这个接口，这样在调用这个动态生成的类之后就会自动调用invoke方法：
+
+```java
+package com.yt.ytrpc.proxy;
+
+import cn.hutool.http.HttpRequest;
+import cn.hutool.http.HttpResponse;
+import com.yt.ytrpc.model.RpcRequest;
+import com.yt.ytrpc.model.RpcResponse;
+import com.yt.ytrpc.serializer.JdkSerializer;
+import com.yt.ytrpc.serializer.Serializer;
+
+import java.io.IOException;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+
+/**
+ * 服务代理（jdk动态代理）
+ */
+public class ServiceProxy implements InvocationHandler {
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        Serializer serializer = new JdkSerializer();
+
+        // 构造请求
+        RpcRequest rpcRequest = RpcRequest.builder()
+                .serviceName(method.getDeclaringClass().getName())
+                .methodName(method.getName())
+                .parameterTypes(method.getParameterTypes()).args(args).build();
+
+        try {
+            byte[] bodyBytes = serializer.serialize(rpcRequest);
+
+            try (HttpResponse httpResponse = HttpRequest.post("http://localhost:8088")
+                    .body(bodyBytes).execute()) {
+                byte[] result = httpResponse.bodyBytes();
+                RpcResponse rpcResponse = serializer.deserialize(result, RpcResponse.class);
+                return rpcResponse.getData();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+}
+```
+
+```java
+package com.yt.example.consumer;
+
+import com.yt.example.common.model.User;
+import com.yt.example.common.service.UserService;
+import com.yt.ytrpc.proxy.ServiceProxyFactory;
+
+/**
+ * @author by Ricardo
+ * @Classname EasyConsumerExample
+ * @Description 简单的消费者样例
+ * @Date 2024/6/27 17:11
+ */
+public class EasyConsumerExample {
+
+    public static void main(String[] args) {
+        UserService userService = ServiceProxyFactory.getProxy(UserService.class);
+        User user = new User();
+
+        user.setName("yt");
+        User newUser = userService.getUser(user);
+        if (newUser != null) {
+            System.out.println(newUser.getName());
+        } else {
+            System.out.println("new user is null");
+        }
+    }
+}
+```
+
+
+
+## 提供全局配置加载
+
+在RPC框架运行的过程中，会涉及到许多的配置信息，比如注册中心的地址，序列化方式，网络服务器端口等
+
+> 之前的简易版 RPC 项目中，是在程序里硬编码了这些配置，不利于维护。
+
+并且RPC框架是需要被其他项目作为服务提供者或者服务消费者引入的，我们应当允许引入框架的项目通过编写配置文件来自定义配置，并且一般情况下，服务提供者和服务消费者需要编写相同的RPC配置
+
+因此，我们需要一套全局配置加载功能。能够让RPC框架轻松地从配置文件中读取配置，并且维护一个全局配置对象，便于框架快速获取到一致的配置
+
+### 1. 设计方案
+
+#### 配置项
+
+先简单配置：
+
+- name 名称
+- version 版本号
+- serverHost 服务器主机名
+- serverPort 服务器端口号
+
+后续随着框架功能的拓展，会不断增加配置项，还可以适当地对配置项进行分组
+
+> 常见的RPC框架配置项：
+>
+> 1. 注册中心地址：服务提供者和服务消费者都需要指定注册中心的地址，以便进行服务的注册和发现。
+> 2. 服务接口：服务提供者需要指定提供的服务接口，而服务消费者需要指定要调用的服务接口。
+> 3. 序列化方式：服务提供者和服务消费者都需要指定序列化方式，以便在网络中传输数据时进行序列化和反序列化。
+> 4. 网络通信协议：服务提供者和服务消费者都需要选择合适的网络通信协议，比如 TCP、HTTP 等。
+> 5. 超时设置：服务提供者和服务消费者都需要设置超时时间，以便在调用服务时进行超时处理。
+> 6. 负载均衡策略：服务消费者需要指定负载均衡策略，以决定调用哪个服务提供者实例。
+> 7. 服务端线程模型：服务提供者需要指定服务端线程模型，以决定如何处理客户端请求。
+
+可以参考Dubbo:
+
+> [https://cn.dubbo.apache.org/zh-cn/overview/mannual/java-sdk/reference-manual/config/api/](https://cn.dubbo.apache.org/zh-cn/overview/mannual/java-sdk/reference-manual/config/api) 
+
+#### 读取配置文件
+
+如何读取配置文件，可以使用Java的 Properties  类自行编写，也可以使用一些第三方工具库
+
+> https://doc.hutool.cn/pages/Props 
+
+一般情况下，我们读取的配置文件名称为 `application.properties`，还可以通过指定文件名称后缀的方式来区分多环境，比如 `application-prod.properties` 表示生产环境、 `application-test.properties` 表示测试环境。
+
+### 2. 开发实现
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
