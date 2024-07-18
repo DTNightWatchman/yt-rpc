@@ -273,13 +273,96 @@ public class EasyConsumerExample {
 
 ### 2. 开发实现
 
+```java
+package com.yt.ytrpccore.utils;
+
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.setting.dialect.Props;
+
+public class ConfigUtils {
+
+    public static <T> T loadConfig(Class<T> tClass, String prefix) {
+        return loadConfig(tClass, prefix, "");
+    }
+
+
+    /**
+     * 根据环境加载配置
+     * @param tClass
+     * @param prefix
+     * @param environment
+     * @return
+     * @param <T>
+     */
+    public static <T> T loadConfig(Class<T> tClass, String prefix, String environment) {
+        StringBuilder configFileBuilder = new StringBuilder("application");
+
+        if (StrUtil.isNotBlank(environment)) {
+            configFileBuilder.append("-").append(environment);
+        }
+        configFileBuilder.append(".properties");
+        Props props = new Props(configFileBuilder.toString());
+        return props.toBean(tClass, prefix);
+    }
+}
+```
 
 
 
+## 序列化器与 SPI 机制
 
+“更好的” 序列化器，可以是具有更高的性能、或者更小的序列化结果，这样就能够更快地完成 RPC 的请求和响应。
 
+### 1. 动态使用序列化器
 
+理想情况下，应该可以通过配置文件来指定使用的序列化器。在使用序列化器时，根据配置来获取不同的序列化器实例即可。
 
+这个操作并不难，只需要定义一个 `序列化器名称 => 序列化器实现类对象` 的 Map，然后根据名称从 Map 中获取对象即可。
+
+### 2. 自定义序列化器
+
+如果开发者不想使用我们框架内置的序列化器，想要自己定义一个新的序列化器实现，但不能修改我们写好的框架代码，应该怎么办呢？
+
+思路很简单：只要我们的 RPC 框架能够读取到用户自定义的类路径，然后加载这个类，作为 Serializer 序列化器接口的实现即可。这里就需要使用到 SPI 机制。
+
+#### 什么是SPI
+
+SPI（Service Provider Interface）服务提供接口是Java的机制，主要是用于实现模块化开发和插件化拓展。
+
+SPI机制允许服务提供者通过特定的配置文件，将自己的实现注册到系统中，然后系统通过反射机制动态加载这些实现，而不需要修改原始框架代码，从而实现了系统的解耦，提高了可拓展性。
+
+一个典型的 SPI 应用场景是 JDBC（Java 数据库连接库），不同的数据库驱动程序开发者可以使用 JDBC 库，然后定制自己的数据库驱动程序。
+
+此外，主流 Java 开发框架中，几乎都使用到了 SPI 机制，比如 Servlet 容器、日志框架、ORM 框架、Spring 框架。**所以这是 Java 开发者必须掌握的一个重要特性！**
+
+#### 如何实现SPI
+
+分为系统实现和自定义实现：
+
+##### 1. 系统实现
+
+Java 内已经提供了 SPI 机制相关的 API 接口，可以直接使用，这种方式最简单。
+
+1）首先在 `resources` 资源目录下创建 `META-INF/services` 目录，并且创建一个名称为要实现的接口的空文件。并且创建一个名称为要实现的接口的空文件。
+
+2）在文件中填写自己定制的的接口实现类的完整类路径
+
+如下：
+
+![image-20240718150115858](assets/image-20240718150115858.png)
+
+3）直接使用系统内置的ServiceLoader 动态加载指定接口的实现类，代码如下：
+
+```java
+// 指定序列化器
+Serializer serializer = null;
+ServiceLoader<Serializer> serviceLoader = ServiceLoader.load(Serializer.class);
+for (Serializer service : serviceLoader) {
+    serializer = service;
+}
+```
+
+上面的代码能够获取到所有文件中编写的实现类对象，选择一个使用即可。
 
 
 
