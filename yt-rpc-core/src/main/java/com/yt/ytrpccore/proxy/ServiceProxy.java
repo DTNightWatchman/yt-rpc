@@ -28,7 +28,7 @@ public class ServiceProxy implements InvocationHandler {
         try {
             byte[] bodyBytes = serializer.serialize(rpcRequest);
 
-            try (HttpResponse httpResponse = HttpRequest.post("http://localhost:8088")
+            try (HttpResponse httpResponse = HttpRequest.post("http://localhost:8080")
                     .body(bodyBytes).execute()) {
                 byte[] result = httpResponse.bodyBytes();
                 RpcResponse rpcResponse = serializer.deserialize(result, RpcResponse.class);

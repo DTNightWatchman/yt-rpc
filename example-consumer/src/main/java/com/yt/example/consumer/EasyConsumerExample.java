@@ -2,7 +2,7 @@ package com.yt.example.consumer;
 
 import com.yt.example.common.model.User;
 import com.yt.example.common.service.UserService;
-import com.yt.ytrpc.proxy.ServiceProxyFactory;
+import com.yt.ytrpccore.proxy.ServiceProxyFactory;
 
 /**
  * @author by Ricardo
@@ -14,14 +14,18 @@ public class EasyConsumerExample {
 
     public static void main(String[] args) {
         UserService userService = ServiceProxyFactory.getProxy(UserService.class);
-        User user = new User();
 
-        user.setName("yt");
-        User newUser = userService.getUser(user);
-        if (newUser != null) {
-            System.out.println(newUser.getName());
-        } else {
-            System.out.println("new user is null");
-        }
+        short number = userService.getNumber();
+        System.out.println(number);
+
+//        User user = new User();
+//
+//        user.setName("yt");
+//        User newUser = userService.getUser(user);
+//        if (newUser != null) {
+//            System.out.println(newUser.getName());
+//        } else {
+//            System.out.println("new user is null");
+//        }
     }
 }
