@@ -1,4 +1,1 @@
 jdk=com.yt.ytrpccore.serializer.JdkSerializer
-hessian=com.yt.ytrpccore.serializer.HessianSerializer
-json=com.yt.ytrpccore.serializer.JsonSerializer
-kryo=com.yt.ytrpccore.serializer.KryoSerializer
