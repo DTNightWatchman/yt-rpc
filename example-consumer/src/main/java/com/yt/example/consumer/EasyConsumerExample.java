@@ -15,17 +15,17 @@ public class EasyConsumerExample {
     public static void main(String[] args) {
         UserService userService = ServiceProxyFactory.getProxy(UserService.class);
 
-        short number = userService.getNumber();
-        System.out.println(number);
+//        short number = userService.getNumber();
+//        System.out.println(number);
 
-//        User user = new User();
-//
-//        user.setName("yt");
-//        User newUser = userService.getUser(user);
-//        if (newUser != null) {
-//            System.out.println(newUser.getName());
-//        } else {
-//            System.out.println("new user is null");
-//        }
+        User user = new User();
+
+        user.setName("yt");
+        User newUser = userService.getUser(user);
+        if (newUser != null) {
+            System.out.println(newUser.getName());
+        } else {
+            System.out.println("new user is null");
+        }
     }
 }

@@ -5,6 +5,7 @@ import com.yt.ytrpccore.RpcApplication;
 import com.yt.ytrpccore.register.LocalRegister;
 import com.yt.ytrpccore.server.HttpServer;
 import com.yt.ytrpccore.server.VertxHttpServer;
+import com.yt.ytrpccore.spi.SpiLoader;
 
 /**
  * @author by Ricardo
@@ -15,6 +16,7 @@ import com.yt.ytrpccore.server.VertxHttpServer;
 public class EasyProviderExample {
 
     public static void main(String[] args) {
+        SpiLoader.loadAll();
         // 注册服务
         RpcApplication.init();
         LocalRegister.register(UserService.class.getName(), UserServiceImpl.class);
