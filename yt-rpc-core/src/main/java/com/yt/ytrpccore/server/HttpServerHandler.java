@@ -1,11 +1,12 @@
 package com.yt.ytrpccore.server;
 
 
+import com.yt.ytrpccore.RpcApplication;
 import com.yt.ytrpccore.model.RpcRequest;
 import com.yt.ytrpccore.model.RpcResponse;
 import com.yt.ytrpccore.register.LocalRegister;
-import com.yt.ytrpccore.serializer.JdkSerializer;
 import com.yt.ytrpccore.serializer.Serializer;
+import com.yt.ytrpccore.serializer.SerializerFactory;
 import io.vertx.core.Handler;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerRequest;
@@ -23,7 +24,9 @@ import java.lang.reflect.Method;
 public class HttpServerHandler implements Handler<HttpServerRequest> {
     @Override
     public void handle(HttpServerRequest httpServerRequest) {
-        final Serializer serializer = new JdkSerializer();
+        // final Serializer serializer = new JdkSerializer();
+        // 修改为通过读取配置文件的 SPI 模式
+        final Serializer serializer = SerializerFactory.getInstance(RpcApplication.getRpcConfig().getSerializer());
 
         System.out.println("Received request:" + httpServerRequest.method() + " " + httpServerRequest.uri());
 

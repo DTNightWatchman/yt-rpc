@@ -16,7 +16,6 @@ import com.yt.ytrpccore.spi.SpiLoader;
 public class EasyProviderExample {
 
     public static void main(String[] args) {
-        SpiLoader.loadAll();
         // 注册服务
         RpcApplication.init();
         LocalRegister.register(UserService.class.getName(), UserServiceImpl.class);
