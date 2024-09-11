@@ -1,4 +1,4 @@
-package com.yt.ytrpccore.register;
+package com.yt.ytrpccore.registry;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.collection.ConcurrentHashSet;

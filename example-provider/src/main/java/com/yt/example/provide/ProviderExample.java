@@ -5,9 +5,9 @@ import com.yt.ytrpccore.RpcApplication;
 import com.yt.ytrpccore.config.RegistryConfig;
 import com.yt.ytrpccore.config.RpcConfig;
 import com.yt.ytrpccore.model.ServiceMetaInfo;
-import com.yt.ytrpccore.register.LocalRegister;
-import com.yt.ytrpccore.register.Registry;
-import com.yt.ytrpccore.register.RegistryFactory;
+import com.yt.ytrpccore.registry.LocalRegister;
+import com.yt.ytrpccore.registry.Registry;
+import com.yt.ytrpccore.registry.RegistryFactory;
 import com.yt.ytrpccore.server.HttpServer;
 import com.yt.ytrpccore.server.VertxHttpServer;
 

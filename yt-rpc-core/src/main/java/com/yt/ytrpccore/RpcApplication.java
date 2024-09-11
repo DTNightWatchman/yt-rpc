@@ -3,8 +3,8 @@ package com.yt.ytrpccore;
 import com.yt.ytrpccore.config.RegistryConfig;
 import com.yt.ytrpccore.config.RpcConfig;
 import com.yt.ytrpccore.constant.RpcConstant;
-import com.yt.ytrpccore.register.Registry;
-import com.yt.ytrpccore.register.RegistryFactory;
+import com.yt.ytrpccore.registry.Registry;
+import com.yt.ytrpccore.registry.RegistryFactory;
 import com.yt.ytrpccore.utils.ConfigUtils;
 import lombok.extern.slf4j.Slf4j;
 

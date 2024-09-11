@@ -1,4 +1,4 @@
-package com.yt.ytrpccore.register;
+package com.yt.ytrpccore.registry;
 
 import com.yt.ytrpccore.spi.SpiLoader;
 

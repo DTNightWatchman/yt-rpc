@@ -9,8 +9,8 @@ import com.yt.ytrpccore.constant.RpcConstant;
 import com.yt.ytrpccore.model.RpcRequest;
 import com.yt.ytrpccore.model.RpcResponse;
 import com.yt.ytrpccore.model.ServiceMetaInfo;
-import com.yt.ytrpccore.register.Registry;
-import com.yt.ytrpccore.register.RegistryFactory;
+import com.yt.ytrpccore.registry.Registry;
+import com.yt.ytrpccore.registry.RegistryFactory;
 import com.yt.ytrpccore.serializer.Serializer;
 import com.yt.ytrpccore.serializer.SerializerFactory;
 

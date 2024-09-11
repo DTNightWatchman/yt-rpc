@@ -1,4 +1,4 @@
-package com.yt.ytrpccore.register;
+package com.yt.ytrpccore.registry;
 
 public interface RegistryKeys {
 

@@ -1,6 +1,6 @@
 package com.yt.ytrpccore.config;
 
-import com.yt.ytrpccore.register.RegistryKeys;
+import com.yt.ytrpccore.registry.RegistryKeys;
 import lombok.Data;
 
 @Data

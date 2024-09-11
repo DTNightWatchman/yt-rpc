@@ -2,10 +2,9 @@ package com.yt.example.provide;
 
 import com.yt.example.common.service.UserService;
 import com.yt.ytrpccore.RpcApplication;
-import com.yt.ytrpccore.register.LocalRegister;
+import com.yt.ytrpccore.registry.LocalRegister;
 import com.yt.ytrpccore.server.HttpServer;
 import com.yt.ytrpccore.server.VertxHttpServer;
-import com.yt.ytrpccore.spi.SpiLoader;
 
 /**
  * @author by Ricardo
