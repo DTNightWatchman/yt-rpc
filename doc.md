@@ -2363,6 +2363,439 @@ public class ZooKeeperRegistry implements Registry {
 
 
 
+## 自定义协议
+
+### 1. 需求分析 
+
+目前的RPC框架，使用的是Vert.x的HttpServer作为服务提供者的服务器，代码实现比较简单，其底层网络使用的是HTTP协议
+
+HTTP只是RPC框架网络传输的一种可选方式
+
+一般情况，RPC框架会比较注重性能，而HTTP协议中的头部信息、请求响应格式会比较重，会影响网络传输性能。
+
+使用浏览器控制台随便查看一个请求，就能看到大量的请求和响应头。
+
+所有，需要自定义一套RPC协议，比如利用TCP等传输层协议，自己定义请求响应结构，来实现性能更高、更灵活、更安全的RPC框架
+
+### 2. 设计方案
+
+自定义RPC协议可以分为2个核心部分
+
+- 自定义网络传输
+- 自定义消息结构
+
+#### （1）网络传输设计
+
+网络传输设计的目标是：选择一个能够高性能通信的网络协议和传输方式
+
+需求分析中已经提到了，HTTP协议的头信息是比较大的，会影响传输性能。但其实除了这点外，HTTP本身属于无状态协议，这意味着每个HTTP请求都是独立的，每次请求/响应都要重新建立和关闭连接，也会影响性能
+
+在HTTP/1.1中引入了持久连接（Keep-Alive）,允许单个TCP连接上发送多个HTTP请求和响应，避免了每次请求都要重新建立和关闭连接的开销
+
+虽然如此，HTTP本身是应用层协议，现在设计的RPC协议也是应用层协议，性能肯定是不如底层（传输层）的TCP协议高，所以要追求更高的性能，还是选择使用 TCP 协议完成网络传输，有更多的自主设计空间。
+
+#### （2）消息结构设计
+
+消息结构设计的目标是：用 **最少的** 空间传递 **需要的** 信息。
+
+如何使用最少的空间？
+
+在定义消息结构时，要尽可能地使用更轻量的类型，比如byte字节类型，只占用1个字节，8个big位。
+
+需要注意的是，Java中实现bit位运算拼接相对比较麻烦，所以设计消息结构时，尽量给每个数据凑到整个字节
+
+消息内需要哪些信息？
+
+目标肯定是能够完成请求，所以从HTTP的请求方式中看到一些线索：
+
+分析 HTTP 请求结构，我们能够得到 RPC 消息所需的信息：
+
+- 魔数：作用是安全校验，防止服务器处理了非框架发来的乱七八糟的消息（类似HTTPS的安全证书）
+- 版本号：保证请求和响应的一致性（类似 HTTP 协议有 1.0/2.0 等版本）
+- 序列化方式：来告诉服务端和客户端如何解析数据（类似 HTTP 的 Content-Type 内容类型）
+- 类型：标识是请求还是响应？或者是心跳检测等其他用途（类似HTTP有请求头和响应头）
+- 状态：如果是响应，要记录响应的结果（类似 HTTP 的 200 状态代码）
+
+此外，还需要有一个请求id，唯一标识某个请求，因为TCP是双向通信，需要有个唯一标识来追踪每个请求
+
+最后，也是最重要的，要发送body内容数据。暂且称谓请求体，类似于之前HTTP请求中发送的RpcRequest
+
+如果是HTTP这种协议，有专门的key/value结构，很容易找到完整的body数据。但基于TCP协议，想要获取完整的body内容数据，就需要一些 “小心思” 了，因为TCP协议本身存在半包和粘包问题，每次传输的数据可能不是完整的。
+
+所以需要在消息头中新增一个字段`请求体数据长度`，保证能够完整地获取body内容信息。
+
+基于以上的思考，可以得到最后的消息结构设计：
+
+ ![img](assets/FhAv0BbijobV6HHZXUFhsPon_AQi.png)
+
+实际上，这些数据应该是紧凑的，请求头信息总长17个字节。也就是说，上述消息结构，本质上就是拼接在一起的一个字节数组。后续实现时，需要有消息编码器和消息解码器，编码器先new一个空的Buffer缓冲区，然后按照顺序向缓冲区依次写入这些数据；解码器在读取的时候也按照顺序读取，就能还原出编码前的数据。
+
+通过这种约定的方式，就不用记录头信息了。比u人magic魔数。不用存储`magic`这个字符串，而是读取第一个字节（前8bit）就能获取到
+
+> 学习 Redis 底层，会发现很多数据结构都是这种设计。
+>
+> 第一次设计协议，或者经验不足，强烈建议大家先去学一下优秀开源框架的协议设计，这样不会说毫无头绪。
+
+这里参考了Dubbo的协议设计：
+
+![img](assets/Fmr1qt5katwSDEdTt_zpg21EtJxs.png)
+
+明确了设计后，我们来开发实现，就比较简单了。
+
+### 3. 开发实现
+
+#### （1）消息结构：
+
+新建protocol包，将所有和自定义协议有关的代码都放到该包下:
+
+新建协议消息类：`ProtocolMessage`
+
+将消息头单独封装成一个内部类，消息体可以使用泛型
+
+```java
+package com.yt.ytrpccore.protocol;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * 协议消息结构
+ */
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class ProtocolMessage<T> {
+
+    /**
+     * 消息头
+     */
+    private Header header;
+
+    /**
+     * 消息体（请求或响应对象）
+     */
+    private T body;
+
+    public static class Header {
+
+        /**
+         * 魔数，保证安全性
+         */
+        private byte magic;
+
+        /**
+         * 版本号
+         */
+        private byte version;
+
+        /**
+         * 序列化器
+         */
+        private byte serializer;
+
+        /**
+         * 消息类型（请求/响应）
+         */
+        private byte type;
+
+        /**
+         * 状态
+         */
+        private byte status;
+
+        /**
+         * 请求id
+         */
+        private long requestId;
+
+        /**
+         * 消息体长度
+         */
+        private int bodyLength;
+    }
+}
+```
+
+新建协议常量`ProtocolConstant`
+
+记录了和自定义协议有关的关键信息，比如消息头长度、魔数、版本号。
+
+代码如下：
+
+
+
+新建消息字段的枚举类
+
+协议状态枚举，暂时只定义成功、请求失败、响应失败三种枚举值
+
+```java
+package com.yt.ytrpccore.protocol;
+
+import lombok.Getter;
+
+@Getter
+public enum ProtocolMessageStatusEnum {
+
+    OK("ok", 20),
+    BAD_REQUEST("badRequest", 40),
+    BAD_RESPONSE("badResponse", 50);
+
+    private final String text;
+
+    private final int value;
+
+    ProtocolMessageStatusEnum(String text, int value) {
+        this.text = text;
+        this.value = value;
+    }
+
+    /**
+     * 根据 value 获取枚举
+     * @param value
+     * @return
+     */
+    public static ProtocolMessageStatusEnum getEnumByValue(int value) {
+        for (ProtocolMessageStatusEnum anEnum : ProtocolMessageStatusEnum.values()) {
+            if (anEnum.value == value) {
+                return anEnum;
+            }
+        }
+        return null;
+    }
+}
+```
+
+协议消息类型枚举，包括请求、响应、心跳、其他。代码如下：
+
+```java
+package com.yt.ytrpccore.protocol;
+
+import lombok.Getter;
+
+/**
+ * 协议消息的类型枚举
+ */
+@Getter
+public enum ProtocolMessageTypeEnum {
+
+    REQUEST(0), // 请求
+    RESPONSE(1), // 响应
+    HEART_BEAT(2), // heart_beat 心跳检测
+    OTHERS(3);
+
+
+    private final int key;
+
+    ProtocolMessageTypeEnum(int key) {
+        this.key = key;
+    }
+
+    /**
+     * 根据 value 获取枚举
+     * @param key
+     * @return
+     */
+    public static ProtocolMessageTypeEnum getEnumByValue(int key) {
+        for (ProtocolMessageTypeEnum anEnum : ProtocolMessageTypeEnum.values()) {
+            if (anEnum.key == key) {
+                return anEnum;
+            }
+        }
+        return null;
+    }
+}
+```
+
+协议消息的序列化器枚举，跟RPC框架已经支持的序列化器对应：
+
+```java
+package com.yt.ytrpccore.protocol;
+
+
+import lombok.Getter;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+/**
+ * 协议消息的序列化器枚举
+ */
+@Getter
+public enum ProtocolMessageSerializerEnum {
+
+    JDK(0, "jdk"),
+    JSON(1, "json"),
+    KRYO(2, "kryo"),
+    HESSIAN(3, "hessian");
+
+
+    private final int key;
+
+    private final String value;
+
+    ProtocolMessageSerializerEnum(int key, String value) {
+        this.key = key;
+        this.value = value;
+    }
+
+    /**
+     * 获取值列表
+     * @return
+     */
+    public static List<String> getValues() {
+        return Arrays.stream(values()).map(item -> item.value).collect(Collectors.toList());
+    }
+
+    /**
+     * 根据key获取枚举
+     * @param key
+     * @return
+     */
+    public static ProtocolMessageSerializerEnum getEnumByKey(int key) {
+        for (ProtocolMessageSerializerEnum anEnum : ProtocolMessageSerializerEnum.values()) {
+            if (anEnum.key == key) {
+                return anEnum;
+            }
+        }
+        return null;
+    }
+
+
+    /**
+     * 根据value获取枚举
+     * @param value
+     * @return
+     */
+    public static ProtocolMessageSerializerEnum getEnumByKey(String value) {
+        for (ProtocolMessageSerializerEnum anEnum : ProtocolMessageSerializerEnum.values()) {
+            if (Objects.equals(anEnum.value, value)) {
+                return anEnum;
+            }
+        }
+        return null;
+    }
+}
+```
+
+#### （2）网络传输
+
+自己写的RPC框架使用了高性能的Vert.x作为网络传输服务器，之前用的是HttpServer。同样，Vert.x也支持TCP服务器，相比于Netty或者自己写的Socket代码，更加简单易用。
+
+首先新建server.tcp包，将所有的TCP服务相关的代码放到该包中。
+
+##### TCP 服务器实现。
+
+新建 `VertxTcpServer`类，跟之前写的 `VertHttpServer `类型，先创建 Vert.x 的服务器实例，然后定义处理请求的方法，最后启动服务器。
+
+代码：
+
+```java
+package com.yt.ytrpccore.server.tcp;
+
+import com.yt.ytrpccore.server.HttpServer;
+import com.yt.ytrpccore.server.VertxHttpServer;
+import io.vertx.core.Vertx;
+import io.vertx.core.buffer.Buffer;
+import io.vertx.core.net.NetServer;
+
+
+public class VertxTcpServer implements HttpServer {
+
+    public static void main(String[] args) {
+        new VertxHttpServer().doStart(8888);
+    }
+
+    @Override
+    public void doStart(int port) {
+        // 创建 Vert.x 实例
+        Vertx vertx = Vertx.vertx();
+
+        // 创建 TCP 服务器
+        NetServer server = vertx.createNetServer();
+
+        server.connectHandler(netSocket -> {
+            netSocket.handler(buffer -> {
+                // 处理接收到的字节数组
+                byte[] requestData = buffer.getBytes();
+                // 在这里进行自定义的字节数组处理逻辑，比如解析请求、调用服务、构造响应等
+                byte[] responseData = handleRequest(requestData);
+                // 发送响应
+                netSocket.write(Buffer.buffer(responseData));
+            });
+        });
+
+        // 启动 TCP 服务并监听指定端口
+        server.listen(port, result -> {
+            if (result.succeeded()) {
+                System.out.println("Server is now listening on port " + port);
+            } else {
+                System.out.println("Fail to start server: " + result.cause());
+            }
+        });
+    }
+
+    private byte[] handleRequest(byte[] requestData) {
+        // todo 这里编写处理请求的逻辑，根据 requestData 构造响应数据并返回
+        // 示例，实际逻辑需要根据具体业务来实现
+        return "hello world".getBytes();
+    }
+}
+
+```
+
+上述代码中的 netSocket.write 方法，就是在向连接到服务器的客户端发送数据，注意发送的数据格式为Buffer，这是Vert.x为我们提供的字节数组缓冲区实现。
+
+##### TCP客户端实现
+
+新建 `VertxTcpClient`类，先创建 Vert.x 的客户端实例，然后定义处理请求的方法（先见简单模拟），并建立连接。
+
+
+
+可以先进行简单的测试，先启动服务器，再启动客户端，要能够再控制台看到互相打招呼的输出。
+
+#### （3）编码/解码器
+
+再上一步中，Vert.x的TCP服务器收发的消息是 Buffer 类型，不能直接写入一个对象。因此，需要编码器和解码器，将Java的消息对象和Buffer进行相互转换。
+
+请求和响应的过程（解码器的作用）：
+
+![img](assets/For6glfIwPTsX5YR3QiNs9eIG3LF.jpeg)
+
+之前HTTP请求和响应时，直接从请求body处理器中获取到body字节数组，再通过序列化（反序列化）得到`RpcRequest`或`RpcResponse`对象。使用TCP服务器后，只不过改为从Buffer中获取字节数组，然后编码解码为`RpcRequest`和`RpcResponse`。其他流程时复用的。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
