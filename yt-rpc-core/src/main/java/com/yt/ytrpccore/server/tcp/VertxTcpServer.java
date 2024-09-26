@@ -1,9 +1,11 @@
 package com.yt.ytrpccore.server.tcp;
 
 import com.yt.ytrpccore.server.HttpServer;
+import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.net.NetServer;
+import io.vertx.core.parsetools.RecordParser;
 
 
 public class VertxTcpServer implements HttpServer {
@@ -20,16 +22,34 @@ public class VertxTcpServer implements HttpServer {
         // 创建 TCP 服务器
         NetServer server = vertx.createNetServer();
 
-        server.connectHandler(netSocket -> {
-            // 处理连接
-            netSocket.handler(buffer -> {
-                // 处理接收到的字节数组
-                byte[] requestData = buffer.getBytes();
-                // 在这里进行自定义的字节数组处理逻辑，比如解析请求、调用服务、构造响应等
-                byte[] responseData = handleRequest(requestData);
-                // 发送响应
-                netSocket.write(Buffer.buffer(responseData));
+//         server.connectHandler(new TcpServerHandler());
+        server.connectHandler(socket -> {
+            // 构造Parser
+            RecordParser parser = RecordParser.newFixed(8);
+            parser.setOutput(new Handler<Buffer>() {
+                int size = -1;
+
+                // 一次性完整读取（头+体）
+                Buffer resultBuffer = Buffer.buffer();
+
+                @Override
+                public void handle(Buffer buffer) {
+                    if (-1 == size) {
+                        // 读取消息体的长度
+                        size = buffer.getInt(4);
+                        parser.fixedSizeMode(size);
+                    } else {
+                        // 写入头信息到结果
+                        resultBuffer.appendBuffer(buffer);
+                        System.out.println(resultBuffer.toString());
+                        // 重置一轮
+                        parser.fixedSizeMode(8);
+                        size = -1;
+                        resultBuffer = Buffer.buffer();
+                    }
+                }
             });
+            socket.handler(parser);
         });
 
         // 启动 TCP 服务并监听指定端口
@@ -40,12 +60,5 @@ public class VertxTcpServer implements HttpServer {
                 System.out.println("Fail to start server: " + result.cause());
             }
         });
-    }
-
-    private byte[] handleRequest(byte[] requestData) {
-        // todo 这里编写处理请求的逻辑，根据 requestData 构造响应数据并返回
-        System.out.println(new String(requestData));
-        // 示例，实际逻辑需要根据具体业务来实现
-        return "hello world".getBytes();
     }
 }

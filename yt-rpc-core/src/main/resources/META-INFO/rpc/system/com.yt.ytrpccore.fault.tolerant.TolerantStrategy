@@ -1,0 +1,4 @@
+failBack=com.yt.ytrpccore.fault.tolerant.FailBackTolerantStrategy
+failFast=com.yt.ytrpccore.fault.tolerant.FailFastTolerantStrategy
+failOver=com.yt.ytrpccore.fault.tolerant.FailOverTolerantStrategy
+failSafe=com.yt.ytrpccore.fault.tolerant.FailSafeTolerantStrategy

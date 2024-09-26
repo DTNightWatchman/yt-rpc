@@ -25,7 +25,7 @@ public enum ProtocolMessageTypeEnum {
      * @param key
      * @return
      */
-    public static ProtocolMessageTypeEnum getEnumByValue(int key) {
+    public static ProtocolMessageTypeEnum getEnumByKey(int key) {
         for (ProtocolMessageTypeEnum anEnum : ProtocolMessageTypeEnum.values()) {
             if (anEnum.key == key) {
                 return anEnum;

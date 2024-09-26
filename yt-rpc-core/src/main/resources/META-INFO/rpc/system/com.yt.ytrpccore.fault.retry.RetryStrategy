@@ -1,0 +1,2 @@
+no=com.yt.ytrpccore.fault.retry.NoRetryStrategy
+fixedInterval=com.yt.ytrpccore.fault.retry.FixedIntervalRetryStrategy

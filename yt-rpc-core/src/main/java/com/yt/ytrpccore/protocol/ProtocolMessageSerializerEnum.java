@@ -57,7 +57,7 @@ public enum ProtocolMessageSerializerEnum {
      * @param value
      * @return
      */
-    public static ProtocolMessageSerializerEnum getEnumByKey(String value) {
+    public static ProtocolMessageSerializerEnum getEnumByValue(String value) {
         for (ProtocolMessageSerializerEnum anEnum : ProtocolMessageSerializerEnum.values()) {
             if (Objects.equals(anEnum.value, value)) {
                 return anEnum;

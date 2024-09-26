@@ -1,0 +1,3 @@
+roundRobin=com.yt.ytrpccore.loadbalancer.RoundRobinLoadBalancer
+random=com.yt.ytrpccore.loadbalancer.RandomLoadBalancer
+consistentHash=com.yt.ytrpccore.loadbalancer.ConsistentHashLoadbalancer

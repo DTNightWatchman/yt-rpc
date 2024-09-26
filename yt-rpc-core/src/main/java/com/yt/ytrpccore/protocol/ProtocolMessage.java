@@ -22,6 +22,7 @@ public class ProtocolMessage<T> {
      */
     private T body;
 
+    @Data
     public static class Header {
 
         /**
